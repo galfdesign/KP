@@ -110,22 +110,23 @@ export default function ManualAreaCalibrator() {
   const [aiFiles, setAiFiles] = useState<File[]>([])
   const aiFileInputRef = useRef<HTMLInputElement | null>(null)
   const [aiDragOver, setAiDragOver] = useState(false)
-  const [openaiKeyLocal, setOpenaiKeyLocal] = useState<string>(() => {
+  const [openaiKeyLocal] = useState<string>(() => {
     try { return localStorage.getItem('OPENAI_API_KEY') || '' } catch { return '' }
   })
 
-  const getOpenAIKey = () => {
-    const envKey = String(((import.meta as any).env?.VITE_OPENAI_API_KEY) || '').trim()
-    if (envKey) return envKey
-    return (openaiKeyLocal || '').trim()
-  }
+  // Helper left in place if потребуется: получение ключа OpenAI из env/localStorage
+  // const getOpenAIKey = () => {
+  //   const envKey = String(((import.meta as any).env?.VITE_OPENAI_API_KEY) || '').trim()
+  //   if (envKey) return envKey
+  //   return (openaiKeyLocal || '').trim()
+  // }
 
   // Canvas size responsive
-  const [canvasSize, setCanvasSize] = useState({ w: 1000, h: 650 })
-  const [viewerSize, setViewerSize] = useState({ w: 900, h: 600 })
+  const [canvasSize] = useState({ w: 1000, h: 650 })
+  const [viewerSize] = useState({ w: 900, h: 600 })
   // Parse area from AI response
   const aiParsed = useMemo(() => parseAreasFromAi(aiResult), [aiResult])
-  const aiBestArea = aiParsed.best
+  // const aiBestArea = aiParsed.best
   const aiAreasList = useMemo(() => Array.from(new Set(aiParsed.all.map(v => Math.round(v)))).sort((a,b)=>b-a), [aiParsed])
   const [aiSelectedArea, setAiSelectedArea] = useState<number | null>(null)
   useEffect(() => {
@@ -555,8 +556,8 @@ export default function ManualAreaCalibrator() {
     ctx.restore()
   }, [canvasSize, imgEl, imgDims, viewScale, viewOffset, fitScale, poly, isClosed, scalePts, metersPerPx, rot])
 
-  const canClose = poly.length >= 3 && !isClosed
-  const canUndo = poly.length > 0 && !isClosed
+  // const canClose = poly.length >= 3 && !isClosed
+  // const canUndo = poly.length > 0 && !isClosed
 
   // Guard against duplicates: pending keys + dedupe in setState
   const pendingKeysRef = useRef<Set<string>>(new Set())
@@ -665,7 +666,7 @@ export default function ManualAreaCalibrator() {
         if (!apiUrl) throw new Error('Не задан VITE_AI_API_URL')
 
         const form = new FormData()
-        filesToSend.forEach((f, idx) => {
+        filesToSend.forEach((f) => {
           form.append('files', f, f.name)
         })
         form.append('task', 'find_heated_area_mentions')
@@ -719,10 +720,10 @@ export default function ManualAreaCalibrator() {
     }
   }
 
-  const resetPoly = () => {
-    setPoly([])
-    setIsClosed(false)
-  }
+  // const resetPoly = () => {
+  //   setPoly([])
+  //   setIsClosed(false)
+  // }
   const resetScale = () => {
     setScalePts([])
     setRealLen("")
