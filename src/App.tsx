@@ -110,7 +110,13 @@ export default function ManualAreaCalibrator() {
   const [aiFiles, setAiFiles] = useState<File[]>([])
   const aiFileInputRef = useRef<HTMLInputElement | null>(null)
   const [aiDragOver, setAiDragOver] = useState(false)
-  const [openaiKeyLocal] = useState<string>(() => {
+  const [providerLocal, setProviderLocal] = useState<'openai'|'custom'>(() => {
+    try { return (localStorage.getItem('AI_PROVIDER') as 'openai'|'custom') || 'openai' } catch { return 'openai' }
+  })
+  const [apiUrlLocal, setApiUrlLocal] = useState<string>(() => {
+    try { return localStorage.getItem('AI_API_URL') || '' } catch { return '' }
+  })
+  const [openaiKeyLocal, setOpenaiKeyLocal] = useState<string>(() => {
     try { return localStorage.getItem('OPENAI_API_KEY') || '' } catch { return '' }
   })
 
@@ -616,7 +622,7 @@ export default function ManualAreaCalibrator() {
     if (filesToSend.length === 0) { setAiError('Нет выбранных файлов'); return }
     try {
       setAiLoading(true)
-      const provider = (import.meta as any).env?.VITE_AI_PROVIDER || 'custom'
+      const provider = ((import.meta as any).env?.VITE_AI_PROVIDER || providerLocal) as 'openai'|'custom'
 
       if (provider === 'openai') {
         // Build OpenAI responses payload
@@ -661,7 +667,7 @@ export default function ManualAreaCalibrator() {
         const text = extractOpenAIText(data)
         setAiResult(String(text || ''))
       } else {
-        const apiUrl = (import.meta as any).env?.VITE_AI_API_URL || ''
+        const apiUrl = (import.meta as any).env?.VITE_AI_API_URL || apiUrlLocal || ''
         const apiKey = (import.meta as any).env?.VITE_AI_API_KEY || ''
         if (!apiUrl) throw new Error('Не задан VITE_AI_API_URL')
 
@@ -877,6 +883,23 @@ export default function ManualAreaCalibrator() {
                 </div>
               </div>
               <div className="text-xs text-slate-400">Файлы: {aiFiles.length>0 ? `${aiFiles.length} выбрано` : (currentFile ? `${currentFile.name} (текущий)` : '—')}</div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                <label className="flex items-center gap-2">
+                  <span className="text-slate-400 w-28">Провайдер</span>
+                  <select value={providerLocal} onChange={(e)=>{ const v=e.target.value as 'openai'|'custom'; setProviderLocal(v); try{localStorage.setItem('AI_PROVIDER', v)}catch{} }} className="px-2 py-1 rounded-md bg-slate-800 text-slate-100">
+                    <option value="openai">OpenAI</option>
+                    <option value="custom">Custom API</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 md:col-span-2">
+                  <span className="text-slate-400 w-28">API URL</span>
+                  <input value={apiUrlLocal} onChange={(e)=>{ setApiUrlLocal(e.target.value); try{localStorage.setItem('AI_API_URL', e.target.value)}catch{} }} placeholder="https://api.example.com/analyze" className="flex-1 px-2 py-1 rounded-md bg-slate-800 text-slate-100" />
+                </label>
+                <label className="flex items-center gap-2 md:col-span-3">
+                  <span className="text-slate-400 w-28">OpenAI ключ</span>
+                  <input type="password" value={openaiKeyLocal} onChange={(e)=>{ setOpenaiKeyLocal(e.target.value); try{ localStorage.setItem('OPENAI_API_KEY', e.target.value) } catch {} }} placeholder="sk-..." className="flex-1 px-2 py-1 rounded-md bg-slate-800 text-slate-100" />
+                </label>
+              </div>
               <div
                 onDragOver={(e)=>{e.preventDefault(); setAiDragOver(true)}}
                 onDragEnter={(e)=>{e.preventDefault(); setAiDragOver(true)}}
