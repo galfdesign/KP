@@ -98,6 +98,30 @@ export default function ManualAreaCalibrator() {
     return items.filter(it => it.enabled)
   }, [prices, enabled, totalAreaM2Rounded])
 
+  // Copy formatted table text
+  const [copiedCosts, setCopiedCosts] = useState(false)
+  const copyCostsToClipboard = async () => {
+    try {
+      const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU').format(Number(v.toFixed(2)))
+      const lines: string[] = []
+      lines.push('Оценка стоимости проектирования')
+      lines.push(`Площадь: ${totalAreaM2Rounded} м²`)
+      lines.push(`Цена за м²: ${fmtMoney(totalPricePerM2)} ₽/м²`)
+      lines.push(`Итого: ${fmtMoney(estimatedCost)} ₽`)
+      lines.push('')
+      lines.push('Разделы:')
+      sectionCosts.forEach(s => {
+        lines.push(`- ${s.title}: ${totalAreaM2Rounded} м² × ${fmtMoney(s.price)} ₽/м² = ${fmtMoney(s.cost)} ₽`)
+      })
+      const text = lines.join('\n')
+      await navigator.clipboard.writeText(text)
+      setCopiedCosts(true)
+      setTimeout(() => setCopiedCosts(false), 1500)
+    } catch (e) {
+      // ignore
+    }
+  }
+
   // Manual area input (m²)
   const [manualArea, setManualArea] = useState<string>("")
 
@@ -110,6 +134,7 @@ export default function ManualAreaCalibrator() {
   const [aiFiles, setAiFiles] = useState<File[]>([])
   const aiFileInputRef = useRef<HTMLInputElement | null>(null)
   const [aiDragOver, setAiDragOver] = useState(false)
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false)
   const [providerLocal, setProviderLocal] = useState<'openai'|'custom'>(() => {
     try { return (localStorage.getItem('AI_PROVIDER') as 'openai'|'custom') || 'openai' } catch { return 'openai' }
   })
@@ -139,10 +164,6 @@ export default function ManualAreaCalibrator() {
     if (aiAreasList.length > 0) setAiSelectedArea(aiAreasList[0])
     else setAiSelectedArea(null)
   }, [aiAreasList])
-  const aiObject = useMemo(() => { const m = /Объект:\s*(.+)/i.exec(aiResult); return m ? m[1].trim() : '' }, [aiResult])
-  const aiAddress = useMemo(() => { const m = /Адрес:\s*(.+)/i.exec(aiResult); return m ? m[1].trim() : '' }, [aiResult])
-  const [viewMode, setViewMode] = useState<'table'|'proposal'>('table')
-  // Размеры для боковой панели (без модалки)
   useEffect(() => {
     if (viewerOpen) return
     const resize = () => {
@@ -753,8 +774,10 @@ export default function ManualAreaCalibrator() {
 
   return (
     <>
-      <header className="w-full bg-slate-950 border-b border-slate-800 px-4 py-2 flex items-center">
-        <img src={logo} alt="Logo" className="h-8 w-auto" />
+      <header className="w-full bg-slate-950 border-b border-slate-800 px-3 pt-4 pb-2">
+        <div className="mx-auto" style={{ width: `${resultWidth}px` }}>
+          <img src={logo} alt="Logo" className="h-8 w-auto" />
+        </div>
       </header>
       <div className="flex h-[88vh] w-full gap-4 p-3 text-slate-100 bg-slate-950">
       <div className="w-[320px] flex-shrink-0 space-y-4 hidden">
@@ -877,29 +900,19 @@ export default function ManualAreaCalibrator() {
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Анализ ИИ</h3>
                 <div className="flex items-center gap-2">
+                  <button onClick={()=>setAiSettingsOpen(true)} className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700" title="Настройки">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.6 15a1.65 1.65 0 0 0-1.51-1H2a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 3.6 8a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8 3.6a1.65 1.65 0 0 0 1-1.51V2a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 16 3.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 20.4 8c.36.52.57 1.15.57 1.8s-.21 1.28-.57 1.8Z" />
+                    </svg>
+                  </button>
                   <button onClick={resetAI} className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700">Сбросить</button>
                   <button onClick={testAIConnection} disabled={aiTestLoading} className={`px-3 py-1 rounded-lg ${!aiTestLoading ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-800/50 cursor-not-allowed'}`}>{aiTestLoading? 'Проверка…' : 'Проверить связь'}</button>
                   <button onClick={analyzeWithAI} disabled={aiLoading || !((aiFiles && aiFiles.length>0) || currentFile)} className={`px-3 py-1 rounded-lg ${((aiFiles && aiFiles.length>0) || currentFile) && !aiLoading ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-800/50 cursor-not-allowed'}`}>{aiLoading? 'Отправка…' : 'Отправить на анализ'}</button>
                 </div>
               </div>
-              <div className="text-xs text-slate-400">Файлы: {aiFiles.length>0 ? `${aiFiles.length} выбрано` : (currentFile ? `${currentFile.name} (текущий)` : '—')}</div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-                <label className="flex items-center gap-2">
-                  <span className="text-slate-400 w-28">Провайдер</span>
-                  <select value={providerLocal} onChange={(e)=>{ const v=e.target.value as 'openai'|'custom'; setProviderLocal(v); try{localStorage.setItem('AI_PROVIDER', v)}catch{} }} className="px-2 py-1 rounded-md bg-slate-800 text-slate-100">
-                    <option value="openai">OpenAI</option>
-                    <option value="custom">Custom API</option>
-                  </select>
-                </label>
-                <label className="flex items-center gap-2 md:col-span-2">
-                  <span className="text-slate-400 w-28">API URL</span>
-                  <input value={apiUrlLocal} onChange={(e)=>{ setApiUrlLocal(e.target.value); try{localStorage.setItem('AI_API_URL', e.target.value)}catch{} }} placeholder="https://api.example.com/analyze" className="flex-1 px-2 py-1 rounded-md bg-slate-800 text-slate-100" />
-                </label>
-                <label className="flex items-center gap-2 md:col-span-3">
-                  <span className="text-slate-400 w-28">OpenAI ключ</span>
-                  <input type="password" value={openaiKeyLocal} onChange={(e)=>{ setOpenaiKeyLocal(e.target.value); try{ localStorage.setItem('OPENAI_API_KEY', e.target.value) } catch {} }} placeholder="sk-..." className="flex-1 px-2 py-1 rounded-md bg-slate-800 text-slate-100" />
-                </label>
-              </div>
+              { (aiFiles.length>0 || currentFile) && <div className="text-xs text-slate-400">Файлы: {aiFiles.length>0 ? `${aiFiles.length} выбрано` : (currentFile ? `${currentFile.name} (текущий)` : '—')}</div> }
+              <div className="text-xs text-slate-400">Для настроек нажмите на иконку шестерёнки.</div>
               <div
                 onDragOver={(e)=>{e.preventDefault(); setAiDragOver(true)}}
                 onDragEnter={(e)=>{e.preventDefault(); setAiDragOver(true)}}
@@ -936,14 +949,10 @@ export default function ManualAreaCalibrator() {
             </div>
             <div className="rounded-xl bg-slate-900 border border-slate-700 shadow-xl p-3 text-sm space-y-1" style={{ gridColumn: '1 / -1' }}>
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <h3 className="font-semibold">Итоги и стоимость</h3>
-                  <div className="flex bg-slate-800 rounded-md overflow-hidden text-xs">
-                    <button onClick={()=>setViewMode('table')} className={`px-2 py-1 ${viewMode==='table'?'bg-blue-600 text-white':'text-slate-300 hover:bg-slate-700'}`}>Таблица</button>
-                    <button onClick={()=>setViewMode('proposal')} className={`px-2 py-1 ${viewMode==='proposal'?'bg-blue-600 text-white':'text-slate-300 hover:bg-slate-700'}`}>КП</button>
-                  </div>
-                </div>
-                <button
+                <h3 className="font-semibold">Итоги и стоимость</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={copyCostsToClipboard} className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200" title="Скопировать в буфер">{copiedCosts ? 'Скопировано' : 'Скопировать'}</button>
+                  <button
                   onClick={() => setSettingsOpen(true)}
                   aria-label="Настройки"
                   title="Настройки"
@@ -954,12 +963,12 @@ export default function ManualAreaCalibrator() {
                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.6 15a1.65 1.65 0 0 0-1.51-1H2a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 3.6 8a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8 3.6a1.65 1.65 0 0 0 1-1.51V2a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 16 3.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 20.4 8c.36.52.57 1.15.57 1.8s-.21 1.28-.57 1.8Z" />
                   </svg>
                 </button>
+                </div>
               </div>
               <div className="flex justify-between"><span className="text-slate-300">Итого</span><span className="text-slate-100 font-semibold">{totalAreaM2Rounded} м²</span></div>
               <div className="flex justify-between"><span className="text-slate-300">Цена за м² (сумма)</span><span className="text-slate-100 font-semibold">{totalPricePerM2.toFixed(2)} ₽/м²</span></div>
               <div className="flex justify-between"><span className="text-slate-300">Общая стоимость</span><span className="text-slate-100 font-semibold">{estimatedCost.toFixed(2)} ₽</span></div>
               <div className="pt-2 text-slate-300">Разделы:</div>
-              {viewMode==='table' && (
               <table className="w-full mt-1 text-sm">
                 <thead>
                   <tr className="text-slate-400">
@@ -980,78 +989,9 @@ export default function ManualAreaCalibrator() {
                   ))}
                 </tbody>
               </table>
-              )}
             </div>
           </div>
-          {/* КП предпросмотр */}
-          {viewMode==='proposal' && (
-          <div className="rounded-xl bg-slate-900 border border-slate-700 shadow-xl p-4 text-sm space-y-3 w-full max-w-[1200px]" style={{ gridColumn: '1 / -1' }}>
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Коммерческое предложение (предпросмотр)</h3>
-              <div className="text-xs text-slate-400">Шаблон можно править — скажите, что изменить</div>
-            </div>
-            <div className="bg-white text-slate-800 rounded-lg overflow-hidden">
-              <div className="p-6 border-b border-slate-200 grid grid-cols-[auto,1fr,auto] items-center gap-4">
-                <img src={logo} alt="Logo" className="h-8 w-auto" />
-                <div>
-                  <div className="text-xl font-bold">Коммерческое предложение</div>
-                  <div className="text-sm text-slate-500">на проектирование инженерных систем</div>
-                </div>
-                <div className="text-right text-sm">
-                  <div><span className="text-slate-500">Дата:</span> {new Date().toLocaleDateString()}</div>
-                  {aiObject && <div><span className="text-slate-500">Объект:</span> {aiObject}</div>}
-                  {aiAddress && <div><span className="text-slate-500">Адрес:</span> {aiAddress}</div>}
-                </div>
-              </div>
-
-              <div className="p-6">
-                <div className="mb-3 font-semibold">Сводные данные</div>
-                <table className="w-full text-sm border border-slate-200 rounded-md overflow-hidden shadow-sm">
-                  <tbody>
-                    <tr className="border-b border-slate-200">
-                      <td className="p-2 bg-slate-50 w-1/3">Итоговая площадь</td>
-                      <td className="p-2 text-right">{totalAreaM2Rounded} м²</td>
-                    </tr>
-                    <tr className="border-b border-slate-200">
-                      <td className="p-2 bg-slate-50">Цена за м² (сумма)</td>
-                      <td className="p-2 text-right">{totalPricePerM2.toFixed(2)} ₽/м²</td>
-                    </tr>
-                    <tr>
-                      <td className="p-2 bg-slate-50 font-semibold">Итого к оплате</td>
-                      <td className="p-2 text-right font-semibold">{estimatedCost.toFixed(2)} ₽</td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                <div className="mt-5 mb-2 font-semibold">Детализация по разделам</div>
-                <table className="w-full text-sm border border-slate-200 rounded-md overflow-hidden shadow-sm">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-600">
-                      <th className="p-2 text-left font-medium">Раздел</th>
-                      <th className="p-2 text-right font-medium">Площадь, м<sup>2</sup></th>
-                      <th className="p-2 text-right font-medium">Цена за м<sup>2</sup></th>
-                      <th className="p-2 text-right font-medium">Сумма</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sectionCosts.map(s => (
-                      <tr key={s.key} className="border-t border-slate-200 odd:bg-white even:bg-slate-50">
-                        <td className="p-2">{s.title}</td>
-                        <td className="p-2 text-right">{totalAreaM2Rounded}</td>
-                        <td className="p-2 text-right">{s.price.toFixed(2)} ₽/м²</td>
-                        <td className="p-2 text-right">{s.cost.toFixed(2)} ₽</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                <div className="mt-6 text-xs text-slate-500">
-                  Данное предложение является предварительным. Окончательная стоимость определяется по итогам уточнения ТЗ и составления договора.
-                </div>
-              </div>
-            </div>
-          </div>
-          )}
+          
         </div>
       </div>
 
@@ -1213,6 +1153,37 @@ export default function ManualAreaCalibrator() {
             </div>
             <div className="mt-3 flex justify-end">
               <button onClick={() => setSettingsOpen(false)} className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500">Готово</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {aiSettingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50">
+          <div className="mt-16 w-[520px] rounded-2xl bg-slate-900 p-4 shadow-2xl border border-slate-700">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-slate-100">Настройки анализа ИИ</h3>
+              <button onClick={() => setAiSettingsOpen(false)} className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200">✕</button>
+            </div>
+            <div className="grid grid-cols-1 gap-3 text-sm">
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-slate-300">Провайдер</span>
+                <select value={providerLocal} onChange={(e)=>{ const v=e.target.value as 'openai'|'custom'; setProviderLocal(v); try{localStorage.setItem('AI_PROVIDER', v)}catch{} }} className="px-2 py-1 rounded-md bg-slate-800 text-slate-100">
+                  <option value="openai">OpenAI</option>
+                  <option value="custom">Custom API</option>
+                </select>
+              </label>
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-slate-300">API URL</span>
+                <input value={apiUrlLocal} onChange={(e)=>{ setApiUrlLocal(e.target.value); try{localStorage.setItem('AI_API_URL', e.target.value)}catch{} }} placeholder="https://api.example.com/analyze" className="w-80 px-2 py-1 rounded-md bg-slate-800 text-slate-100" />
+              </label>
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-slate-300">OpenAI ключ</span>
+                <input type="password" value={openaiKeyLocal} onChange={(e)=>{ setOpenaiKeyLocal(e.target.value); try{ localStorage.setItem('OPENAI_API_KEY', e.target.value) } catch {} }} placeholder="sk-..." className="w-80 px-2 py-1 rounded-md bg-slate-800 text-slate-100" />
+              </label>
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button onClick={() => setAiSettingsOpen(false)} className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500">Готово</button>
             </div>
           </div>
         </div>
