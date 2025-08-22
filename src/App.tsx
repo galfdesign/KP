@@ -701,7 +701,7 @@ export default function ManualAreaCalibrator() {
     setAiTestResult("")
     setAiTestLoading(true)
     try {
-      const provider = (import.meta as any).env?.VITE_AI_PROVIDER || 'custom'
+      const provider = ((import.meta as any).env?.VITE_AI_PROVIDER || providerLocal) as 'openai'|'custom'
       if (provider === 'openai') {
         const envKey = (import.meta as any).env?.VITE_OPENAI_API_KEY || ''
         const openaiKey = envKey.trim() || (openaiKeyLocal || '').trim()
@@ -709,8 +709,8 @@ export default function ManualAreaCalibrator() {
         const res = await fetch('https://api.openai.com/v1/models', { headers: { 'Authorization': `Bearer ${openaiKey}` } })
         setAiTestResult(`OpenAI: HTTP ${res.status}`)
       } else {
-        const apiUrl = (import.meta as any).env?.VITE_AI_API_URL || ''
-        if (!apiUrl) { setAiTestResult('Custom: не задан VITE_AI_API_URL'); return }
+        const apiUrl = (import.meta as any).env?.VITE_AI_API_URL || apiUrlLocal || ''
+        if (!apiUrl) { setAiTestResult('Custom: задайте API URL ниже'); return }
         try {
           const head = await fetch(apiUrl, { method: 'HEAD' })
           if (head.ok) { setAiTestResult(`HEAD: HTTP ${head.status}`); return }
