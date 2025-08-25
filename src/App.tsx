@@ -98,6 +98,26 @@ export default function ManualAreaCalibrator() {
     return items.filter(it => it.enabled)
   }, [prices, enabled, totalAreaM2Rounded])
 
+  // Text for messengers (КП)
+  const proposalText = useMemo(() => {
+    const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU').format(Number(v.toFixed(2)))
+    const lines: string[] = []
+    lines.push('Коммерческое предложение — проектирование инженерных систем')
+    lines.push(`Дата: ${new Date().toLocaleDateString('ru-RU')}`)
+    lines.push('')
+    lines.push(`Площадь: ${totalAreaM2Rounded} м²`)
+    lines.push(`Цена за м² (сумма): ${fmtMoney(totalPricePerM2)} ₽/м²`)
+    lines.push(`Итого: ${fmtMoney(estimatedCost)} ₽`)
+    if (sectionCosts.length) {
+      lines.push('')
+      lines.push('Детализация по разделам:')
+      sectionCosts.forEach(s => {
+        lines.push(`• ${s.title}: ${totalAreaM2Rounded} м² × ${fmtMoney(s.price)} ₽/м² = ${fmtMoney(s.cost)} ₽`)
+      })
+    }
+    return lines.join('\n')
+  }, [totalAreaM2Rounded, totalPricePerM2, estimatedCost, sectionCosts])
+
   // Copy formatted table text
   const [copiedCosts, setCopiedCosts] = useState(false)
   const copyCostsToClipboard = async () => {
@@ -120,6 +140,15 @@ export default function ManualAreaCalibrator() {
     } catch (e) {
       // ignore
     }
+  }
+
+  const [copiedProposal, setCopiedProposal] = useState(false)
+  const copyProposalToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(proposalText)
+      setCopiedProposal(true)
+      setTimeout(() => setCopiedProposal(false), 1500)
+    } catch {}
   }
 
   // Manual area input (m²)
@@ -860,6 +889,13 @@ export default function ManualAreaCalibrator() {
                 <div className="text-slate-100 font-semibold">{currentAreaRounded>0?currentAreaRounded:'—'} м²</div>
               </div>
             </div>
+          </div>
+          <div className="rounded-xl bg-slate-900 border border-slate-700 shadow-xl p-3 text-sm space-y-2" style={{ gridColumn: '1 / -1' }}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">КП для мессенджера</h3>
+              <button onClick={copyProposalToClipboard} className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200" title="Скопировать КП">{copiedProposal ? 'Скопировано' : 'Скопировать'}</button>
+            </div>
+            <pre className="whitespace-pre-wrap break-words text-slate-200 bg-slate-800/40 p-2 rounded-md text-sm">{proposalText}</pre>
           </div>
           <div className="flex items-stretch">
             <button
