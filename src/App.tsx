@@ -64,7 +64,7 @@ export default function ManualAreaCalibrator() {
     ventilation: number
     conditioning: number
     electrical: number
-  }>({ heatingWaterBoiler: 200, sewerage: 60, ventilation: 160, conditioning: 140, electrical: 220 })
+  }>({ heatingWaterBoiler: 200, sewerage: 60, ventilation: 140, conditioning: 140, electrical: 240 })
   const [enabled, setEnabled] = useState<{
     heatingWaterBoiler: boolean
     sewerage: boolean
@@ -88,35 +88,80 @@ export default function ManualAreaCalibrator() {
   }
 
   const sectionCosts = useMemo(() => {
+    const minFor = (key: string) => (key === 'electrical' ? 35000 : 25000)
+    const makeCost = (key: string, price: number) => {
+      const base = totalAreaM2Rounded * price
+      if (totalAreaM2Rounded <= 0) return 0
+      if (key === 'sewerage') return base
+      return Math.max(base, minFor(key))
+    }
     const items = [
-      { key: 'heatingWaterBoiler', title: 'Системы отопления, водоснабжения, котельная (сумма)', price: prices.heatingWaterBoiler, enabled: enabled.heatingWaterBoiler, cost: totalAreaM2Rounded * prices.heatingWaterBoiler },
-      { key: 'sewerage', title: 'Канализация', price: prices.sewerage, enabled: enabled.sewerage, cost: totalAreaM2Rounded * prices.sewerage },
-      { key: 'ventilation', title: 'Вентиляция', price: prices.ventilation, enabled: enabled.ventilation, cost: totalAreaM2Rounded * prices.ventilation },
-      { key: 'conditioning', title: 'Кондиционирование', price: prices.conditioning, enabled: enabled.conditioning, cost: totalAreaM2Rounded * prices.conditioning },
-      { key: 'electrical', title: 'Электрические сети', price: prices.electrical, enabled: enabled.electrical, cost: totalAreaM2Rounded * prices.electrical },
+      { key: 'heatingWaterBoiler', title: 'Системы отопления, водоснабжения, котельная (сумма)', price: prices.heatingWaterBoiler, enabled: enabled.heatingWaterBoiler, cost: makeCost('heatingWaterBoiler', prices.heatingWaterBoiler) },
+      { key: 'sewerage', title: 'Канализация', price: prices.sewerage, enabled: enabled.sewerage, cost: makeCost('sewerage', prices.sewerage) },
+      { key: 'ventilation', title: 'Вентиляция', price: prices.ventilation, enabled: enabled.ventilation, cost: makeCost('ventilation', prices.ventilation) },
+      { key: 'conditioning', title: 'Кондиционирование', price: prices.conditioning, enabled: enabled.conditioning, cost: makeCost('conditioning', prices.conditioning) },
+      { key: 'electrical', title: 'Электрические сети', price: prices.electrical, enabled: enabled.electrical, cost: makeCost('electrical', prices.electrical) },
     ] as const
     return items.filter(it => it.enabled)
   }, [prices, enabled, totalAreaM2Rounded])
+
+  // Общая стоимость с учётом минимальной цены раздела (кроме канализации)
+  const estimatedCostFinal = useMemo(() => {
+    if (totalAreaM2Rounded <= 0) return 0
+    return sectionCosts.reduce((sum, s) => sum + s.cost, 0)
+  }, [sectionCosts, totalAreaM2Rounded])
+
+  // Разделы, которых нет в КП (выключены)
+  const disabledSections = useMemo(() => {
+    const all = [
+      { key: 'heatingWaterBoiler', title: 'Системы отопления, водоснабжения, котельная (сумма)', price: prices.heatingWaterBoiler, enabled: enabled.heatingWaterBoiler },
+      { key: 'sewerage', title: 'Канализация', price: prices.sewerage, enabled: enabled.sewerage },
+      { key: 'ventilation', title: 'Вентиляция', price: prices.ventilation, enabled: enabled.ventilation },
+      { key: 'conditioning', title: 'Кондиционирование', price: prices.conditioning, enabled: enabled.conditioning },
+      { key: 'electrical', title: 'Электрические сети', price: prices.electrical, enabled: enabled.electrical },
+    ] as const
+    return all.filter(it => !it.enabled)
+  }, [prices, enabled])
+
+  const disabledSectionLines = useMemo(() => {
+    const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU').format(Number(v.toFixed(2)))
+    return disabledSections.map(s => {
+      const base = totalAreaM2Rounded * s.price
+      const min = s.key === 'electrical' ? 35000 : 25000
+      const cost = (totalAreaM2Rounded > 0 && s.key !== 'sewerage') ? Math.max(base, min) : base
+      return `${s.title}: ${fmtMoney(s.price)} ₽/м² → за ${totalAreaM2Rounded} м² = ${fmtMoney(cost)} ₽`
+    })
+  }, [disabledSections, totalAreaM2Rounded])
 
   // Text for messengers (КП)
   const proposalText = useMemo(() => {
     const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU').format(Number(v.toFixed(2)))
     const lines: string[] = []
-    lines.push('Коммерческое предложение — проектирование инженерных систем')
+    const sep = '────────────────────────────────'
+    lines.push('КП на проектирование инженерных систем')
+    lines.push(sep)
     lines.push(`Дата: ${new Date().toLocaleDateString('ru-RU')}`)
     lines.push('')
-    lines.push(`Площадь: ${totalAreaM2Rounded} м²`)
+    lines.push(`Отапливаемая площадь: ${totalAreaM2Rounded} м²`)
     lines.push(`Цена за м² (сумма): ${fmtMoney(totalPricePerM2)} ₽/м²`)
-    lines.push(`Итого: ${fmtMoney(estimatedCost)} ₽`)
+    lines.push(`Итого к оплате: ${fmtMoney(estimatedCost)} ₽`)
     if (sectionCosts.length) {
       lines.push('')
       lines.push('Детализация по разделам:')
       sectionCosts.forEach(s => {
-        lines.push(`• ${s.title}: ${totalAreaM2Rounded} м² × ${fmtMoney(s.price)} ₽/м² = ${fmtMoney(s.cost)} ₽`)
+        const base = totalAreaM2Rounded * s.price
+        const min = s.key === 'electrical' ? 35000 : 25000
+        const minNote = s.key!=='sewerage' && totalAreaM2Rounded>0 && base < min ? ` (мин. ${fmtMoney(min)} ₽)` : ''
+        lines.push(`• ${s.title} — ${totalAreaM2Rounded} м² × ${fmtMoney(s.price)} ₽/м² = ${fmtMoney(s.cost)} ₽${minNote}`)
       })
     }
+    // дополнительные разделы отображаем только в UI (красным), в текст КП не включаем
+    lines.push('')
+    lines.push('Скачать PDF примеров проектов: https://t.me/galfdesign/1455')
     return lines.join('\n')
-  }, [totalAreaM2Rounded, totalPricePerM2, estimatedCost, sectionCosts])
+  }, [totalAreaM2Rounded, totalPricePerM2, estimatedCost, sectionCosts, disabledSections])
+
+  // markdown версия больше не используется
 
   // Copy formatted table text
   const [copiedCosts, setCopiedCosts] = useState(false)
@@ -145,11 +190,14 @@ export default function ManualAreaCalibrator() {
   const [copiedProposal, setCopiedProposal] = useState(false)
   const copyProposalToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(proposalText)
+      const tail = disabledSectionLines.length ? `\n\nТакже вы можете заказать проектирование:\n${disabledSectionLines.map(l=>`- ${l}`).join('\n')}` : ''
+      const full = `${proposalText}${tail}`
+      await navigator.clipboard.writeText(full)
       setCopiedProposal(true)
       setTimeout(() => setCopiedProposal(false), 1500)
     } catch {}
   }
+  // markdown-кнопка удалена
 
   // Manual area input (m²)
   const [manualArea, setManualArea] = useState<string>("")
@@ -890,13 +938,8 @@ export default function ManualAreaCalibrator() {
               </div>
             </div>
           </div>
-          <div className="rounded-xl bg-slate-900 border border-slate-700 shadow-xl p-3 text-sm space-y-2" style={{ gridColumn: '1 / -1' }}>
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">КП для мессенджера</h3>
-              <button onClick={copyProposalToClipboard} className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200" title="Скопировать КП">{copiedProposal ? 'Скопировано' : 'Скопировать'}</button>
-            </div>
-            <pre className="whitespace-pre-wrap break-words text-slate-200 bg-slate-800/40 p-2 rounded-md text-sm">{proposalText}</pre>
-          </div>
+          
+          
           <div className="flex items-stretch">
             <button
               onClick={addResult}
@@ -1003,7 +1046,7 @@ export default function ManualAreaCalibrator() {
               </div>
               <div className="flex justify-between"><span className="text-slate-300">Итого</span><span className="text-slate-100 font-semibold">{totalAreaM2Rounded} м²</span></div>
               <div className="flex justify-between"><span className="text-slate-300">Цена за м² (сумма)</span><span className="text-slate-100 font-semibold">{totalPricePerM2.toFixed(2)} ₽/м²</span></div>
-              <div className="flex justify-between"><span className="text-slate-300">Общая стоимость</span><span className="text-slate-100 font-semibold">{estimatedCost.toFixed(2)} ₽</span></div>
+              <div className="flex justify-between"><span className="text-slate-300">Общая стоимость</span><span className="text-slate-100 font-semibold">{estimatedCostFinal.toFixed(2)} ₽</span></div>
               <div className="pt-2 text-slate-300">Разделы:</div>
               <table className="w-full mt-1 text-sm">
                 <thead>
@@ -1026,6 +1069,25 @@ export default function ManualAreaCalibrator() {
                 </tbody>
               </table>
             </div>
+          </div>
+          <div className="rounded-xl bg-slate-900 border border-slate-700 shadow-xl p-3 text-sm space-y-2 mt-6 mb-[100px]" style={{ gridColumn: '1 / -1' }}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">КП для мессенджера</h3>
+              <div className="flex gap-2">
+                <button onClick={copyProposalToClipboard} className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200" title="Скопировать текст">{copiedProposal ? 'Скопировано' : 'Скопировать'}</button>
+              </div>
+            </div>
+            <pre className="whitespace-pre-wrap break-words bg-slate-800/40 p-2 rounded-md text-sm">
+              <span className="text-slate-200">{proposalText}</span>
+              {disabledSectionLines.length>0 && (
+                <div className="mt-2 italic text-red-400">
+                  Также вы можете заказать проектирование:
+                  {disabledSectionLines.map((l, i)=> (
+                    <div key={i}>- {l}</div>
+                  ))}
+                </div>
+              )}
+            </pre>
           </div>
           
         </div>
