@@ -134,6 +134,7 @@ export default function ManualAreaCalibrator() {
   }, [disabledSections, totalAreaM2Rounded])
 
   // Text for messengers (КП)
+  const [proposalDetailed, setProposalDetailed] = useState(false)
   const proposalText = useMemo(() => {
     const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU').format(Number(v.toFixed(2)))
     const lines: string[] = []
@@ -149,17 +150,21 @@ export default function ManualAreaCalibrator() {
       lines.push('')
       lines.push('Детализация по разделам:')
       sectionCosts.forEach(s => {
-        const base = totalAreaM2Rounded * s.price
-        const min = s.key === 'electrical' ? 35000 : 25000
-        const minNote = s.key!=='sewerage' && totalAreaM2Rounded>0 && base < min ? ` (мин. ${fmtMoney(min)} ₽)` : ''
-        lines.push(`• ${s.title} — ${totalAreaM2Rounded} м² × ${fmtMoney(s.price)} ₽/м² = ${fmtMoney(s.cost)} ₽${minNote}`)
+        if (proposalDetailed) {
+          const base = totalAreaM2Rounded * s.price
+          const min = s.key === 'electrical' ? 35000 : 25000
+          const minNote = s.key !== 'sewerage' && totalAreaM2Rounded > 0 && base < min ? ` (мин. ${fmtMoney(min)} ₽)` : ''
+          lines.push(`• ${s.title} — ${totalAreaM2Rounded} м² × ${fmtMoney(s.price)} ₽/м² = ${fmtMoney(s.cost)} ₽${minNote}`)
+        } else {
+          lines.push(`• ${s.title} — ${fmtMoney(s.cost)} ₽`)
+        }
       })
     }
     // дополнительные разделы отображаем только в UI (красным), в текст КП не включаем
     lines.push('')
     lines.push('Скачать PDF примеров проектов: https://t.me/galfdesign/1455')
     return lines.join('\n')
-  }, [totalAreaM2Rounded, totalPricePerM2, estimatedCost, sectionCosts, disabledSections])
+  }, [totalAreaM2Rounded, totalPricePerM2, estimatedCost, sectionCosts, disabledSections, proposalDetailed])
 
   // markdown версия больше не используется
 
@@ -1074,6 +1079,7 @@ export default function ManualAreaCalibrator() {
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">КП для мессенджера</h3>
               <div className="flex gap-2">
+                <button onClick={() => setProposalDetailed(v => !v)} className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200" title="Переключить детализацию">{proposalDetailed ? 'Детализация: вкл' : 'Детализация: выкл'}</button>
                 <button onClick={copyProposalToClipboard} className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200" title="Скопировать текст">{copiedProposal ? 'Скопировано' : 'Скопировать'}</button>
               </div>
             </div>
