@@ -145,7 +145,7 @@ export default function ManualAreaCalibrator() {
     lines.push('')
     lines.push(`Отапливаемая площадь: ${totalAreaM2Rounded} м²`)
     lines.push(`Цена за м² (сумма): ${fmtMoney(totalPricePerM2)} ₽/м²`)
-    lines.push(`Итого к оплате: ${fmtMoney(estimatedCost)} ₽`)
+    lines.push(`Итого к оплате: ${fmtMoney(estimatedCostFinal)} ₽`)
     if (sectionCosts.length) {
       lines.push('')
       lines.push('Детализация по разделам:')
@@ -164,7 +164,7 @@ export default function ManualAreaCalibrator() {
     lines.push('')
     lines.push('Скачать PDF примеров проектов: https://t.me/galfdesign/1455')
     return lines.join('\n')
-  }, [totalAreaM2Rounded, totalPricePerM2, estimatedCost, sectionCosts, disabledSections, proposalDetailed])
+  }, [totalAreaM2Rounded, totalPricePerM2, estimatedCostFinal, sectionCosts, disabledSections, proposalDetailed])
 
   // markdown версия больше не используется
 
