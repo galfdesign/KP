@@ -138,10 +138,7 @@ export default function ManualAreaCalibrator() {
   const proposalText = useMemo(() => {
     const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU').format(Number(v.toFixed(2)))
     const lines: string[] = []
-    const sep = '────────────────────────────────'
-    lines.push('КП на проектирование инженерных систем')
-    lines.push(sep)
-    lines.push(`Дата: ${new Date().toLocaleDateString('ru-RU')}`)
+    lines.push('Подготовили расчет стоимости проекта по отапливаемой площади дома.')
     lines.push('')
     lines.push(`Отапливаемая площадь: ${totalAreaM2Rounded} м²`)
     lines.push(`Цена за м² (сумма): ${fmtMoney(totalPricePerM2)} ₽/м²`)
@@ -203,6 +200,28 @@ export default function ManualAreaCalibrator() {
     } catch {}
   }
   // markdown-кнопка удалена
+
+  // Contract info text with explicit line breaks + copy helper
+  const contractInfoText = [
+    'Для заключения договора на разработку проектной документации, прошу предоставить данные физического лица:',
+    '• ФИО',
+    '• паспорт: серия и номер, кем и когда выдан',
+    '• адрес прописки',
+    '• контактный номер телефона и эл. почта.',
+    '• адрес объекта',
+    'Либо реквизиты юридического лица.',
+    'Обращаю Ваше внимание, что при условии оплаты на расчетный счет стоимость договора увеличивается на 10%. Без НДС.'
+  ].join('\n')
+  const [copiedContract, setCopiedContract] = useState(false)
+  const copyContractInfoToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(contractInfoText)
+      setCopiedContract(true)
+      setTimeout(() => setCopiedContract(false), 1500)
+    } catch (e) {
+      // ignore
+    }
+  }
 
   // Manual area input (m²)
   const [manualArea, setManualArea] = useState<string>("")
@@ -1075,7 +1094,7 @@ export default function ManualAreaCalibrator() {
               </table>
             </div>
           </div>
-          <div className="rounded-xl bg-slate-900 border border-slate-700 shadow-xl p-3 text-sm space-y-2 mt-6 mb-[100px]" style={{ gridColumn: '1 / -1' }}>
+          <div className="rounded-xl bg-slate-900 border border-slate-700 shadow-xl p-3 text-sm space-y-2 mt-6" style={{ width: `${resultWidth}px` }}>
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">КП для мессенджера</h3>
               <div className="flex gap-2">
@@ -1094,6 +1113,19 @@ export default function ManualAreaCalibrator() {
                 </div>
               )}
             </pre>
+          </div>
+          <div className="rounded-xl bg-slate-900 border border-slate-700 shadow-xl p-3 text-sm space-y-2 mt-3 mb-[100px]" style={{ width: `${resultWidth}px` }}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Информация для договора</h3>
+              <div className="flex gap-2">
+                <button onClick={copyContractInfoToClipboard} className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200" title="Скопировать текст">{copiedContract ? 'Скопировано' : 'Скопировать'}</button>
+              </div>
+            </div>
+            <div className="bg-slate-800/40 p-3 rounded-md text-sm text-slate-200 border border-red-500/50">
+              <div className="whitespace-pre-wrap leading-relaxed">
+                {contractInfoText}
+              </div>
+            </div>
           </div>
           
         </div>
